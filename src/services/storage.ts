@@ -87,6 +87,17 @@ Balance: Tk 9100.00
   },
 ];
 
+const LEGACY_DEMO_TRX_IDS = new Set([
+  'DI5276PLJY',
+  'DI5876R1VG',
+  '75XVTPVI',
+  '75X3V7DE',
+  '6910652291',
+  'MULTI_A123',
+  'MULTI_B123',
+  'DI155TESTNEW',
+]);
+
 class MfsStorageService {
   private payments: UniversalPayment[] = [];
   private duplicateLogs: DuplicateAttemptLog[] = [];
@@ -106,23 +117,31 @@ class MfsStorageService {
       const storedRawLogs = localStorage.getItem(STORAGE_KEYS.RAW_LOGS);
 
       if (storedPayments) {
-        this.payments = JSON.parse(storedPayments);
-      }
-      if (storedDuplicates) {
-        this.duplicateLogs = JSON.parse(storedDuplicates);
-      }
-      if (storedRawLogs) {
-        this.rawSmsLogs = JSON.parse(storedRawLogs);
+        const parsed: UniversalPayment[] = JSON.parse(storedPayments);
+        // Purge any legacy demo payments from local browser storage
+        this.payments = (parsed || []).filter(
+          (p) => !LEGACY_DEMO_TRX_IDS.has(p.transactionId) && !LEGACY_DEMO_TRX_IDS.has(p.id)
+        );
+      } else {
+        this.payments = [];
       }
 
-      // Initial seed if empty
-      if (!localStorage.getItem(STORAGE_KEYS.INITIALIZED)) {
-        this.seedInitialSamples();
-        localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
+      if (storedDuplicates) {
+        this.duplicateLogs = JSON.parse(storedDuplicates);
+      } else {
+        this.duplicateLogs = [];
+      }
+
+      if (storedRawLogs) {
+        this.rawSmsLogs = JSON.parse(storedRawLogs);
+      } else {
+        this.rawSmsLogs = [];
       }
     } catch (e) {
       console.error('Failed to load local database', e);
-      this.seedInitialSamples();
+      this.payments = [];
+      this.duplicateLogs = [];
+      this.rawSmsLogs = [];
     }
   }
 
@@ -135,32 +154,12 @@ class MfsStorageService {
       subscribeToFirestorePayments(
         (remotePayments) => {
           this.isFirebaseConnected = true;
-          if (remotePayments && remotePayments.length > 0) {
-            // Merge remote payments with local without duplicates
-            const map = new Map<string, UniversalPayment>();
-            // Keep remote as primary source of truth
-            remotePayments.forEach((p) => {
-              const key = (p.transactionId || p.id).toUpperCase();
-              map.set(key, p);
-            });
-            // Also keep any local payments that haven't synced yet
-            this.payments.forEach((p) => {
-              const key = (p.transactionId || p.id).toUpperCase();
-              if (!map.has(key)) {
-                map.set(key, p);
-                // Push local to remote
-                savePaymentToFirestore(p).catch((err) =>
-                  console.warn('Sync payment to firestore error:', err)
-                );
-              }
-            });
-
-            this.payments = Array.from(map.values()).sort(
-              (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
-            );
-            this.saveToStorage(false); // save locally without re-notifying in loop
-            this.notifyListeners();
-          }
+          // Remote Firestore is the single source of truth
+          this.payments = (remotePayments || []).sort(
+            (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
+          );
+          this.saveToStorage(false);
+          this.notifyListeners();
         },
         (err) => {
           console.warn('Firestore subscription error (will use offline local storage):', err);
@@ -221,24 +220,6 @@ class MfsStorageService {
 
   private notifyListeners() {
     this.listeners.forEach((l) => l());
-  }
-
-  public seedInitialSamples() {
-    this.payments = [];
-    this.duplicateLogs = [];
-    this.rawSmsLogs = [];
-
-    // Parse all prompt samples into payments
-    for (const sample of SAMPLE_PROMPT_SMS) {
-      const res = parseMfsSms(sample.sms);
-      if (res.success && res.payment) {
-        this.payments.push(res.payment);
-        // Also save to Firestore
-        savePaymentToFirestore(res.payment).catch(() => {});
-      }
-    }
-
-    this.saveToStorage();
   }
 
   public getPayments(): UniversalPayment[] {
@@ -364,7 +345,14 @@ class MfsStorageService {
     this.payments = [];
     this.duplicateLogs = [];
     this.rawSmsLogs = [];
-    this.saveToStorage();
+    try {
+      localStorage.removeItem(STORAGE_KEYS.PAYMENTS);
+      localStorage.removeItem(STORAGE_KEYS.DUPLICATES);
+      localStorage.removeItem(STORAGE_KEYS.RAW_LOGS);
+    } catch {
+      // ignore
+    }
+    this.saveToStorage(true);
     clearAllFirestorePayments().catch((err) => {
       console.warn('Failed to clear Firestore:', err);
     });

@@ -17,7 +17,9 @@ import {
   Copy,
   Check,
   Globe,
-  ExternalLink,
+  RefreshCw,
+  FileText,
+  ShieldAlert,
 } from 'lucide-react';
 import { firebaseConfig, databaseId } from '../services/firebase';
 
@@ -44,8 +46,12 @@ export function AdminModal({
   const [testSms, setTestSms] = useState('');
   const [smsFeedback, setSmsFeedback] = useState<string | null>(null);
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
+  const [activeTab, setActiveTab] = useState<'payments' | 'logs' | 'setup'>('payments');
 
   if (!isOpen) return null;
+
+  const duplicateLogs = mfsStorage.getDuplicateLogs();
+  const rawSmsLogs = mfsStorage.getRawSmsLogs();
 
   const handleLogin = (e: FormEvent) => {
     e.preventDefault();
@@ -94,7 +100,7 @@ export function AdminModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-zinc-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-zinc-200 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="px-6 py-4 bg-zinc-900 text-white flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
@@ -119,7 +125,7 @@ export function AdminModal({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-6 overflow-y-auto space-y-5 flex-1">
           {!isAdminAuthenticated ? (
             /* Login Form */
             <form onSubmit={handleLogin} className="space-y-4 max-w-sm mx-auto py-6">
@@ -169,7 +175,7 @@ export function AdminModal({
             </form>
           ) : (
             /* Authenticated Admin Dashboard */
-            <div className="space-y-6">
+            <div className="space-y-5">
               {/* Notification Banner */}
               {clearSuccessMsg && (
                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-3 rounded-xl flex items-center space-x-2 animate-in fade-in">
@@ -178,204 +184,313 @@ export function AdminModal({
                 </div>
               )}
 
-              {/* Cloud & Firebase Connection Status Card */}
-              <div className="bg-zinc-900 text-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-                <div className="flex items-center space-x-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                    <Cloud className="w-5 h-5" />
+              {/* Status Header */}
+              <div className="bg-zinc-900 text-white p-3.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                    <Cloud className="w-4 h-4" />
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-white">Firebase Firestore ক্লাউড কানেক্টেড</span>
+                      <span className="text-xs font-bold text-white">Firebase Firestore লাইভ কানেক্টেড</span>
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     </div>
-                    <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
-                      Project: {firebaseConfig.projectId}
+                    <p className="text-[10px] text-zinc-400 font-mono">
+                      Database: {databaseId || '(default)'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2 text-[11px] bg-zinc-800 px-3 py-1.5 rounded-xl border border-zinc-700 text-zinc-300">
+                <div className="flex items-center space-x-2 text-[11px] text-zinc-300">
                   <Globe className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Vercel Deploy Ready (vercel.json active)</span>
+                  <span>Vercel Deploy Ready</span>
                 </div>
               </div>
 
-              {/* Data Clear Action Card (The primary request!) */}
-              <div className="bg-red-50/70 border border-red-200 rounded-2xl p-5 space-y-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <AlertTriangle className="w-4 h-4 text-red-600" />
-                      <h4 className="text-sm font-bold text-red-900">ডাটা ক্লিয়ার অপশন (All Clear)</h4>
-                    </div>
-                    <p className="text-xs text-red-700">
-                      জমে থাকা সকল পেমেন্ট রেকর্ড এবং ক্লাউড মেসেজ হিস্ট্রি এক ক্লিকে সম্পূর্ণ মুছে ফেলতে নিচের বাটনে ক্লিক করুন।
-                    </p>
-                  </div>
-                  <span className="text-xs font-bold text-zinc-700 bg-white px-2.5 py-1 rounded-lg border border-red-200 shrink-0">
-                    মোট রেকর্ড: {payments.length}
+              {/* Tabs Navigation */}
+              <div className="flex border-b border-zinc-200 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('payments')}
+                  className={`pb-2 px-3 border-b-2 transition flex items-center space-x-1.5 cursor-pointer ${
+                    activeTab === 'payments'
+                      ? 'border-zinc-900 text-zinc-900'
+                      : 'border-transparent text-zinc-500 hover:text-zinc-800'
+                  }`}
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  <span>সংরক্ষিত পেমেন্ট ({payments.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('logs')}
+                  className={`pb-2 px-3 border-b-2 transition flex items-center space-x-1.5 cursor-pointer ${
+                    activeTab === 'logs'
+                      ? 'border-zinc-900 text-zinc-900'
+                      : 'border-transparent text-zinc-500 hover:text-zinc-800'
+                  }`}
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>
+                    ডুপ্লিকেট ও মেসেজ হিস্ট্রি ({duplicateLogs.length + rawSmsLogs.length})
                   </span>
-                </div>
+                </button>
 
-                {!showClearConfirm ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowClearConfirm(true)}
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>অল ক্লিয়ার (Clear All Data)</span>
-                  </button>
-                ) : (
-                  <div className="bg-white p-3.5 rounded-xl border border-red-300 space-y-2 animate-in fade-in">
-                    <p className="text-xs font-bold text-red-700">
-                      ⚠️ আপনি কি নিশ্চিত যে আপনি সকল ডাটা মুছে ফেলতে চান? এটি Firebase ক্লাউড থেকেও মুছে যাবে।
-                    </p>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        onClick={handleClearAllData}
-                        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer"
-                      >
-                        হ্যাঁ, সকল ডাটা মুছুন
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowClearConfirm(false)}
-                        className="px-4 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold transition cursor-pointer"
-                      >
-                        বাতিল
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('setup')}
+                  className={`pb-2 px-3 border-b-2 transition flex items-center space-x-1.5 cursor-pointer ${
+                    activeTab === 'setup'
+                      ? 'border-zinc-900 text-zinc-900'
+                      : 'border-transparent text-zinc-500 hover:text-zinc-800'
+                  }`}
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>মোবাইল অটো-সিঙ্ক ও ক্লিয়ার</span>
+                </button>
               </div>
 
-              {/* Phone SMS to Firebase Sync Guide */}
-              <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-5 space-y-3">
-                <div className="flex items-center space-x-2 text-sky-950 font-bold text-sm">
-                  <Smartphone className="w-4 h-4 text-sky-600" />
-                  <h4>মোবাইল ফোন থেকে অফলাইন SMS স্বয়ংক্রিয়ভাবে পাঠানোর নিয়ম</h4>
-                </div>
-
-                <div className="text-xs text-sky-900 space-y-2 leading-relaxed">
-                  <p>
-                    আপনার অ্যান্ড্রয়েড ফোনে যখন bKash, Nagad বা Rocket এর SMS আসবে, তখন সেটি স্বয়ংক্রিয়ভাবে ফায়ারবেসে পাঠানোর জন্য নিচের যেকোনো একটি ফ্রি অ্যাপ ব্যবহার করতে পারেন:
-                  </p>
-                  <ol className="list-decimal list-inside space-y-1 pl-1 text-[12px] font-medium text-sky-950">
-                    <li>
-                      <b>SMS Forwarder (by Lan兵)</b> অথবা <b>MacroDroid</b> অ্যাপটি গুগল প্লে-স্টোর থেকে ইনস্টল করুন।
-                    </li>
-                    <li>
-                      একটি রুল তৈরি করুন: বিকাশ/নগদ/রকেট থেকে নতুন SMS এলে তা Webhook/URL এ পাঠাবে।
-                    </li>
-                    <li>
-                      টার্গেট URL হিসেবে নিচের Firestore REST Endpoint ব্যবহার করুন:
-                    </li>
-                  </ol>
-
-                  {/* Copyable Endpoint Box */}
-                  <div className="bg-white p-2.5 rounded-xl border border-sky-300 flex items-center justify-between gap-2 font-mono text-[11px] text-zinc-800">
-                    <span className="truncate">{firestoreApiUrl}</span>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(firestoreApiUrl)}
-                      className="px-2.5 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded-md font-sans text-xs flex items-center space-x-1 shrink-0 cursor-pointer"
-                    >
-                      {copiedEndpoint ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedEndpoint ? 'কপি হয়েছে' : 'কপি করুন'}</span>
-                    </button>
-                  </div>
-
-                  <p className="text-[11px] text-sky-800">
-                    💡 <b>টিপ:</b> অথবা সরাসরি এই অ্যাডমিন প্যানেল থেকে যেকোনো সময় নতুন SMS পেস্ট করে যুক্ত করতে পারেন।
-                  </p>
-                </div>
-              </div>
-
-              {/* Add / Test Incoming SMS Section */}
-              <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Play className="w-4 h-4 text-zinc-800" />
-                    <h4 className="text-sm font-bold text-zinc-900">ম্যানুয়াল SMS ইনপুট (Add Incoming SMS)</h4>
-                  </div>
-                  <span className="text-[11px] text-zinc-500">bKash, Nagad, Rocket, Upay</span>
-                </div>
-
-                {smsFeedback && (
-                  <div className="text-xs p-2.5 rounded-lg bg-zinc-900 text-emerald-400 font-medium">
-                    {smsFeedback}
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <textarea
-                    rows={2}
-                    value={testSms}
-                    onChange={(e) => setTestSms(e.target.value)}
-                    placeholder="যেকোনো পেমেন্ট SMS এখানে পেস্ট করুন..."
-                    className="w-full p-2.5 text-xs font-mono bg-white border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900"
-                  />
-
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={handleIngestSms}
-                      disabled={!testSms.trim()}
-                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer shadow-xs"
-                    >
-                      <Play className="w-3 h-3 fill-current" />
-                      <span>মেসেজ পার্স ও সেভ করুন</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Stored Payments Overview */}
-              <div className="border border-zinc-200 rounded-2xl overflow-hidden">
-                <div className="bg-zinc-100 px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
-                  <div className="flex items-center space-x-2 text-xs font-bold text-zinc-800">
-                    <Database className="w-4 h-4 text-zinc-600" />
-                    <span>সংরক্ষিত পেমেন্ট তালিকা ({payments.length})</span>
-                  </div>
-                  <span className="text-[11px] text-zinc-500 font-mono">
-                    মোট: {payments.length} টি
-                  </span>
-                </div>
-
-                <div className="max-h-56 overflow-y-auto divide-y divide-zinc-200 text-xs">
-                  {payments.length === 0 ? (
-                    <div className="p-4 text-center text-zinc-400">
-                      কোনো পেমেন্ট সংরক্ষিত নেই।
-                    </div>
-                  ) : (
-                    payments.map((p, idx) => (
-                      <div key={`${p.id}-${idx}`} className="p-3 flex items-center justify-between hover:bg-zinc-50">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center space-x-2 font-mono">
-                            <span className="font-bold text-zinc-900">{p.provider}</span>
-                            <span className="text-emerald-700 font-bold">৳{p.amount.toFixed(2)}</span>
-                            <span className="text-zinc-500">({p.phoneNumber})</span>
-                          </div>
-                          <div className="text-[11px] text-zinc-500 font-mono">
-                            লাস্ট ৩ ডিজিট: <b className="text-zinc-800">{p.last3Digits}</b> · TrxID: {p.transactionId} · {p.time}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => mfsStorage.deletePayment(p.id)}
-                          className="text-zinc-400 hover:text-red-600 p-1.5 rounded cursor-pointer"
-                          title="মুছুন"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+              {/* TAB 1: PAYMENTS */}
+              {activeTab === 'payments' && (
+                <div className="space-y-4">
+                  {/* Manual Test Ingestion */}
+                  <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5 text-xs font-bold text-zinc-800">
+                        <Play className="w-3.5 h-3.5 text-zinc-700" />
+                        <span>ম্যানুয়াল SMS যোগ করুন</span>
                       </div>
-                    ))
+                      <span className="text-[10px] text-zinc-400">bKash, Nagad, Rocket, Upay</span>
+                    </div>
+
+                    {smsFeedback && (
+                      <div className="text-xs p-2 rounded-lg bg-zinc-900 text-emerald-400 font-medium">
+                        {smsFeedback}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={testSms}
+                        onChange={(e) => setTestSms(e.target.value)}
+                        placeholder="পেমেন্ট SMS পেস্ট করুন..."
+                        className="flex-1 p-2 text-xs font-mono bg-white border border-zinc-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleIngestSms}
+                        disabled={!testSms.trim()}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold transition flex items-center space-x-1 cursor-pointer shrink-0"
+                      >
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>সেভ</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Payment List */}
+                  <div className="border border-zinc-200 rounded-xl overflow-hidden">
+                    <div className="bg-zinc-100 px-3.5 py-2.5 border-b border-zinc-200 flex items-center justify-between">
+                      <span className="text-xs font-bold text-zinc-800">
+                        পেমেন্ট রেকর্ড তালিকা ({payments.length} টি)
+                      </span>
+                      <span className="text-[11px] text-zinc-500 font-mono">
+                        লাস্ট ৩ ডিজিট সার্চের জন্য সক্রিয়
+                      </span>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto divide-y divide-zinc-200 text-xs">
+                      {payments.length === 0 ? (
+                        <div className="p-6 text-center text-zinc-400">
+                          কোনো পেমেন্ট রেকর্ড নেই।
+                        </div>
+                      ) : (
+                        payments.map((p, idx) => (
+                          <div
+                            key={`${p.id}-${idx}`}
+                            className="p-3 flex items-center justify-between hover:bg-zinc-50 transition"
+                          >
+                            <div className="space-y-0.5">
+                              <div className="flex items-center space-x-2 font-mono">
+                                <span className="font-bold text-zinc-900">{p.provider}</span>
+                                <span className="text-emerald-700 font-bold">
+                                  ৳{p.amount.toFixed(2)}
+                                </span>
+                                <span className="text-zinc-500">({p.phoneNumber})</span>
+                              </div>
+                              <div className="text-[11px] text-zinc-500 font-mono">
+                                লাস্ট ৩ ডিজিট:{' '}
+                                <b className="text-zinc-900 bg-amber-50 px-1 py-0.5 rounded border border-amber-200">
+                                  {p.last3Digits}
+                                </b>{' '}
+                                · TrxID: {p.transactionId} · {p.time}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => mfsStorage.deletePayment(p.id)}
+                              className="text-zinc-400 hover:text-red-600 p-1.5 rounded transition cursor-pointer"
+                              title="ডিলিট করুন"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: LOGS & DUPLICATES */}
+              {activeTab === 'logs' && (
+                <div className="space-y-4">
+                  <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 space-y-1">
+                    <div className="flex items-center space-x-1.5 font-bold">
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                      <span>ডুপ্লিকেট ট্রানজেকশন প্রটেকশন তথ্য</span>
+                    </div>
+                    <p className="leading-relaxed text-[11.5px]">
+                      একই TrxID দিয়ে যাতে প্রতারণা বা ডাবল পেমেন্ট ক্লেইম না হতে পারে, সেজন্য সিস্টেম একই TrxID দ্বিতীয়বার রিসিভ করলে তা স্বয়ংক্রিয়ভাবে ব্লক করে দেয়।
+                    </p>
+                  </div>
+
+                  {/* Duplicate Logs Section */}
+                  <div className="border border-zinc-200 rounded-xl overflow-hidden">
+                    <div className="bg-zinc-100 px-3.5 py-2 border-b border-zinc-200 flex items-center justify-between text-xs font-bold text-zinc-800">
+                      <span>আটকে যাওয়া ডুপ্লিকেট চেষ্টার তালিকা ({duplicateLogs.length})</span>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto divide-y divide-zinc-200 text-xs">
+                      {duplicateLogs.length === 0 ? (
+                        <div className="p-4 text-center text-zinc-400">
+                          কোনো ডুপ্লিকেট পেমেন্ট চেষ্টার রেকর্ড নেই।
+                        </div>
+                      ) : (
+                        duplicateLogs.map((dup) => (
+                          <div key={dup.id} className="p-3 bg-red-50/40 space-y-1">
+                            <div className="flex items-center justify-between text-red-900 font-bold">
+                              <span>TrxID: {dup.transactionId}</span>
+                              <span className="text-[11px] text-zinc-500 font-normal">
+                                {new Date(dup.attemptedAt).toLocaleTimeString()}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-red-700">{dup.reason}</p>
+                            <p className="text-[10px] text-zinc-500 font-mono truncate">
+                              SMS: {dup.rawSms}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Raw Unparsed / Unknown Logs */}
+                  {rawSmsLogs.length > 0 && (
+                    <div className="border border-zinc-200 rounded-xl overflow-hidden">
+                      <div className="bg-zinc-100 px-3.5 py-2 border-b border-zinc-200 text-xs font-bold text-zinc-800">
+                        অন্যান্য মেসেজ লগ ({rawSmsLogs.length})
+                      </div>
+                      <div className="max-h-36 overflow-y-auto divide-y divide-zinc-200 text-xs">
+                        {rawSmsLogs.map((log) => (
+                          <div key={log.id} className="p-2.5 text-zinc-600 font-mono text-[11px]">
+                            {log.rawSms}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
+
+              {/* TAB 3: SETUP & CLEAR */}
+              {activeTab === 'setup' && (
+                <div className="space-y-4">
+                  {/* Phone Sync Setup */}
+                  <div className="bg-sky-50/70 border border-sky-200 rounded-xl p-4 space-y-2.5">
+                    <div className="flex items-center space-x-2 text-sky-950 font-bold text-xs">
+                      <Smartphone className="w-4 h-4 text-sky-600" />
+                      <h4>মোবাইল MacroDroid কনফিগারেশন এন্ডপয়েন্ট</h4>
+                    </div>
+
+                    <div className="bg-white p-2.5 rounded-xl border border-sky-300 flex items-center justify-between gap-2 font-mono text-[11px] text-zinc-800">
+                      <span className="truncate">{firestoreApiUrl}</span>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(firestoreApiUrl)}
+                        className="px-2.5 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded-md font-sans text-xs flex items-center space-x-1 shrink-0 cursor-pointer"
+                      >
+                        {copiedEndpoint ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                        <span>{copiedEndpoint ? 'কপি হয়েছে' : 'কপি করুন'}</span>
+                      </button>
+                    </div>
+
+                    <p className="text-[11px] text-sky-800 leading-relaxed">
+                      💡 <b>টিপস:</b> বিকাশ/নগদের মেসেজ ফোনে এলে MacroDroid এর মাধ্যমে এই URL এ POST
+                      হয়ে ফায়ারবেসে জমা হবে। এরপর অ্যাপ স্বয়ংক্রিয়ভাবে ট্রানজেকশন প্রসেস করবে।
+                    </p>
+                  </div>
+
+                  {/* All Clear Data Action */}
+                  <div className="bg-red-50/70 border border-red-200 rounded-xl p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <AlertTriangle className="w-4 h-4 text-red-600" />
+                          <h4 className="text-xs font-bold text-red-900">
+                            ডাটা ক্লিয়ার অপশন (All Clear)
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-red-700">
+                          সকল ডেমো পেমেন্ট ও পুরনো মেসেজ সম্পূর্ণ মুছে ফেলতে অল ক্লিয়ার করুন।
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-zinc-700 bg-white px-2 py-0.5 rounded border border-red-200 shrink-0">
+                        রেকর্ড: {payments.length}
+                      </span>
+                    </div>
+
+                    {!showClearConfirm ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowClearConfirm(true)}
+                        className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>অল ক্লিয়ার (Clear All Data)</span>
+                      </button>
+                    ) : (
+                      <div className="bg-white p-3 rounded-xl border border-red-300 space-y-2 animate-in fade-in">
+                        <p className="text-xs font-bold text-red-700">
+                          ⚠️ আপনি কি নিশ্চিত যে আপনি সকল ডাটা মুছে ফেলতে চান?
+                        </p>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={handleClearAllData}
+                            className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer"
+                          >
+                            হ্যাঁ, সকল ডাটা মুছুন
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowClearConfirm(false)}
+                            className="px-3.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold transition cursor-pointer"
+                          >
+                            বাতিল
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Logout button */}
               <div className="pt-2 flex justify-end">

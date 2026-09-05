@@ -81,12 +81,26 @@ export function subscribeToFirestorePayments(
   }
 }
 
+const DEMO_BLOCKED_IDS = new Set([
+  'DI5276PLJY',
+  'DI5876R1VG',
+  '75XVTPVI',
+  '75X3V7DE',
+  '6910652291',
+  'MULTI_A123',
+  'MULTI_B123',
+  'DI155TESTNEW',
+]);
+
 /**
  * Save or update payment in Firestore
  */
 export async function savePaymentToFirestore(payment: UniversalPayment): Promise<void> {
+  const docId = payment.id || payment.transactionId;
+  if (!docId || DEMO_BLOCKED_IDS.has(docId) || DEMO_BLOCKED_IDS.has(payment.transactionId)) {
+    return;
+  }
   try {
-    const docId = payment.id || payment.transactionId;
     const paymentRef = doc(db, PAYMENTS_COLLECTION, docId);
     await setDoc(paymentRef, payment, { merge: true });
   } catch (err) {
