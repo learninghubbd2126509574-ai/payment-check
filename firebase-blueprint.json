@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "entities": {
+    "payments": {
+      "title": "Payment",
+      "description": "MFS transaction payments parsed from SMS",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "provider": { "type": "string", "enum": ["bKash", "Nagad", "Rocket", "Upay"] },
+        "amount": { "type": "number" },
+        "phoneNumber": { "type": "string" },
+        "last3Digits": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "rawSms": { "type": "string" },
+        "reference": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["transactionId", "provider", "amount", "phoneNumber", "last3Digits"]
+    },
+    "raw_sms": {
+      "title": "Raw SMS Log",
+      "description": "Raw SMS messages forwarded from mobile device",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sms": { "type": "string" },
+        "sender": { "type": "string" },
+        "receivedAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["sms", "receivedAt"]
+    }
+  }
+}

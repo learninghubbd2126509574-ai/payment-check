@@ -1,0 +1,6 @@
+{
+  "name": "Unity Earning",
+  "description": "Unity Earning MFS 3-digit payment search and verification system with keypad and secure admin portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
