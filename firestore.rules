@@ -2,15 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /payments/{paymentId} {
-      allow read, delete: if true;
-      allow create, update: if paymentId != 'DI5276PLJY' &&
-                               paymentId != 'DI5876R1VG' &&
-                               paymentId != '75XVTPVI' &&
-                               paymentId != '75X3V7DE' &&
-                               paymentId != '6910652291' &&
-                               paymentId != 'MULTI_A123' &&
-                               paymentId != 'MULTI_B123' &&
-                               paymentId != 'DI155TESTNEW';
+      allow read, write: if true;
     }
     match /raw_sms/{smsId} {
       allow read, write: if true;
@@ -20,5 +12,6 @@ service cloud.firestore {
     }
   }
 }
+
 
 

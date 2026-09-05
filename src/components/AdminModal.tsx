@@ -60,7 +60,7 @@ export function AdminModal({
       setErrorMsg('');
       setPasswordInput('');
     } else {
-      setErrorMsg('ভুল পাসওয়ার্ড! সঠিক পাসওয়ার্ড দিন (Password: 212650)');
+      setErrorMsg('ভুল পাসওয়ার্ড! আবার চেষ্টা করুন');
     }
   };
 
@@ -148,7 +148,7 @@ export function AdminModal({
                       setPasswordInput(e.target.value);
                       setErrorMsg('');
                     }}
-                    placeholder="পাসওয়ার্ড লিখুন (212650)"
+                    placeholder="পাসওয়ার্ড লিখুন..."
                     autoFocus
                     className="w-full px-4 py-2.5 text-sm bg-zinc-50 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 font-mono transition"
                   />

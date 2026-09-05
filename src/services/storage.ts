@@ -87,17 +87,6 @@ Balance: Tk 9100.00
   },
 ];
 
-const LEGACY_DEMO_TRX_IDS = new Set([
-  'DI5276PLJY',
-  'DI5876R1VG',
-  '75XVTPVI',
-  '75X3V7DE',
-  '6910652291',
-  'MULTI_A123',
-  'MULTI_B123',
-  'DI155TESTNEW',
-]);
-
 class MfsStorageService {
   private payments: UniversalPayment[] = [];
   private duplicateLogs: DuplicateAttemptLog[] = [];
@@ -117,11 +106,7 @@ class MfsStorageService {
       const storedRawLogs = localStorage.getItem(STORAGE_KEYS.RAW_LOGS);
 
       if (storedPayments) {
-        const parsed: UniversalPayment[] = JSON.parse(storedPayments);
-        // Purge any legacy demo payments from local browser storage
-        this.payments = (parsed || []).filter(
-          (p) => !LEGACY_DEMO_TRX_IDS.has(p.transactionId) && !LEGACY_DEMO_TRX_IDS.has(p.id)
-        );
+        this.payments = JSON.parse(storedPayments) || [];
       } else {
         this.payments = [];
       }

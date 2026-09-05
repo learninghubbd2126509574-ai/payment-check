@@ -15,8 +15,8 @@ export function Header({
   rawLogsCount,
 }: HeaderProps) {
   const handleResetData = () => {
-    if (window.confirm('Reset local database with the prompt specification test SMS records?')) {
-      mfsStorage.seedInitialSamples();
+    if (window.confirm('সকল লোকাল ও ক্লাউড ডাটা ক্লিয়ার করতে চান?')) {
+      mfsStorage.clearAll();
     }
   };
 
